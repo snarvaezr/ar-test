@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeApp() {
     console.log('Inicializando aplicación de escaneo 3D con AR');
+    console.log('THREE.js disponible:', typeof THREE !== 'undefined');
+    console.log('GLTFExporter disponible:', typeof THREE !== 'undefined' && typeof THREE.GLTFExporter !== 'undefined');
+    console.log('Model Viewer disponible:', typeof document.createElement('model-viewer') !== 'undefined');
     checkDeviceCapabilities();
 }
 
@@ -277,28 +280,28 @@ async function generateModel3D() {
         const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
 
         // Crear material simple sin textura para evitar problemas de CORS en AR
+        // Usar MeshBasicMaterial para que no dependa de luces
         const material = new THREE.MeshStandardMaterial({
             color: 0x6366f1,
             roughness: 0.5,
-            metalness: 0.3
+            metalness: 0.3,
+            emissive: 0x6366f1,
+            emissiveIntensity: 0.3
         });
 
         const mesh = new THREE.Mesh(geometry, material);
-
-        // Agregar luz a la escena para que sea visible en AR
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(1, 1, 1);
-        scene.add(light);
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-
         scene.add(mesh);
 
         AppState.model3D = {
             scene: scene,
             mesh: mesh
         };
+
+        console.log('Modelo 3D generado:', {
+            geometry: geometry.type,
+            vertices: geometry.attributes.position.count,
+            material: material.type
+        });
 
         resolve(AppState.model3D);
     });
@@ -415,19 +418,29 @@ function render3DPreview() {
 
 // Mostrar en AR
 async function showARView() {
+    console.log('=== INICIANDO VISTA AR ===');
+    console.log('Estado del modelo:', AppState.model3D ? 'Disponible' : 'No disponible');
+
     showScreen('ar');
 
     // Exportar modelo a formato GLB para AR
     try {
+        console.log('Llamando a exportToGLB...');
         const glbData = await exportToGLB();
+
+        console.log('GLB Data recibida:', glbData);
+        console.log('Longitud de URL:', glbData.length);
 
         // Configurar model-viewer con el modelo
         elements.arViewer.src = glbData;
 
-        console.log('Modelo cargado en AR viewer');
+        console.log('Model Viewer src configurado');
+        console.log('Esperando carga del modelo...');
+
     } catch (error) {
         console.error('Error al exportar modelo:', error);
-        alert('Error al preparar el modelo para AR. Por favor, intenta nuevamente.');
+        console.error('Stack trace:', error.stack);
+        alert('Error al preparar el modelo para AR: ' + error);
     }
 }
 
@@ -459,11 +472,29 @@ async function exportToGLB() {
 
         exporter.parse(
             AppState.model3D.scene,
-            (gltf) => {
-                console.log('Modelo exportado exitosamente', gltf);
+            (result) => {
+                console.log('Modelo exportado exitosamente');
+                console.log('Tipo de resultado:', typeof result);
+                console.log('Es ArrayBuffer?', result instanceof ArrayBuffer);
 
-                // Convertir a Blob
-                const blob = new Blob([gltf], { type: 'model/gltf-binary' });
+                let blob;
+
+                // Si es ArrayBuffer (binario GLB), usarlo directamente
+                if (result instanceof ArrayBuffer) {
+                    blob = new Blob([result], { type: 'model/gltf-binary' });
+                    console.log('Blob GLB creado desde ArrayBuffer');
+                }
+                // Si es objeto (GLTF JSON), convertirlo a JSON string
+                else if (typeof result === 'object') {
+                    const jsonString = JSON.stringify(result);
+                    blob = new Blob([jsonString], { type: 'model/gltf+json' });
+                    console.log('Blob GLTF JSON creado desde objeto');
+                }
+                else {
+                    reject('Formato de exportación no reconocido');
+                    return;
+                }
+
                 console.log('Blob creado, tamaño:', blob.size, 'bytes');
 
                 const url = URL.createObjectURL(blob);
