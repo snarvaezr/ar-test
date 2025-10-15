@@ -4,6 +4,7 @@ const AppState = {
     currentScreen: 'welcome',
     stream: null,
     model3D: null,
+    glbUrl: null,
     requiredCaptures: 12
 };
 
@@ -401,59 +402,52 @@ async function showARView() {
     showScreen('ar');
 
     // Exportar modelo a formato GLB para AR
-    const glbData = await exportToGLB();
+    try {
+        const glbData = await exportToGLB();
 
-    // Configurar model-viewer con el modelo
-    elements.arViewer.src = glbData;
+        // Configurar model-viewer con el modelo
+        elements.arViewer.src = glbData;
 
-    console.log('Modelo cargado en AR viewer');
+        console.log('Modelo cargado en AR viewer');
+    } catch (error) {
+        console.error('Error al exportar modelo:', error);
+        alert('Error al preparar el modelo para AR. Por favor, intenta nuevamente.');
+    }
 }
 
-// Exportar modelo a GLB (simplificado)
+// Exportar modelo a GLB usando GLTFExporter
 async function exportToGLB() {
-    // En una aplicación real, usarías GLTFExporter de Three.js
-    // Por ahora, usamos un modelo de ejemplo
+    return new Promise((resolve, reject) => {
+        if (!AppState.model3D || !AppState.model3D.scene) {
+            reject('No hay modelo 3D disponible');
+            return;
+        }
 
-    // Crear un blob URL con datos del modelo
-    // Como fallback, usamos un modelo de ejemplo o generamos uno básico
+        // Usar GLTFExporter para convertir la escena a GLB
+        const exporter = new THREE.GLTFExporter();
 
-    // Esta es una URL de ejemplo de un modelo GLB simple
-    // En producción, generarías el GLB desde tu modelo 3D capturado
-    const exampleModelUrl = 'data:application/octet-stream;base64,Z2xURgIAAAA...';
+        exporter.parse(
+            AppState.model3D.scene,
+            (gltf) => {
+                // Convertir a Blob
+                const blob = new Blob([gltf], { type: 'model/gltf-binary' });
+                const url = URL.createObjectURL(blob);
 
-    // O mejor aún, generar dinámicamente desde las capturas
-    return createDynamicGLB();
-}
+                // Guardar URL para limpieza posterior
+                if (AppState.glbUrl) {
+                    URL.revokeObjectURL(AppState.glbUrl);
+                }
+                AppState.glbUrl = url;
 
-function createDynamicGLB() {
-    // Crear un modelo simple basado en las capturas
-    // En una app real, esto usaría THREE.GLTFExporter
-
-    // Por ahora retornamos una URL al modelo embebido
-    return generateSimpleModel();
-}
-
-function generateSimpleModel() {
-    // Genera un cubo texturizado básico como demostración
-    // En producción esto sería reemplazado por el modelo real reconstruido
-
-    const scene = new THREE.Scene();
-    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-
-    // Usar la primera captura como textura
-    const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(AppState.captures[0].url);
-
-    const material = new THREE.MeshStandardMaterial({
-        map: texture
+                resolve(url);
+            },
+            (error) => {
+                console.error('Error en GLTFExporter:', error);
+                reject(error);
+            },
+            { binary: true }
+        );
     });
-
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-
-    // Retornar URL del blob (simplificado)
-    // En un caso real usarías GLTFExporter aquí
-    return AppState.captures[0].url; // Placeholder
 }
 
 // Reiniciar aplicación
@@ -462,6 +456,12 @@ function resetApp() {
     AppState.captures.forEach(capture => {
         URL.revokeObjectURL(capture.url);
     });
+
+    // Limpiar GLB URL
+    if (AppState.glbUrl) {
+        URL.revokeObjectURL(AppState.glbUrl);
+        AppState.glbUrl = null;
+    }
 
     AppState.captures = [];
     AppState.model3D = null;
@@ -490,4 +490,7 @@ window.addEventListener('beforeunload', () => {
     AppState.captures.forEach(capture => {
         URL.revokeObjectURL(capture.url);
     });
+    if (AppState.glbUrl) {
+        URL.revokeObjectURL(AppState.glbUrl);
+    }
 });
