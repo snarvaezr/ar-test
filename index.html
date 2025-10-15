@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escaneo 3D con Realidad Aumentada</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Three.js para renderizado 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Model Viewer para AR -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Pantalla de bienvenida -->
+        <div id="welcome-screen" class="screen active">
+            <div class="container">
+                <h1>Escaneo 3D con AR</h1>
+                <p>Escanea objetos desde múltiples ángulos y visualízalos en realidad aumentada</p>
+                <button id="start-scan-btn" class="btn-primary">Iniciar Escaneo</button>
+                <div class="info-card">
+                    <h3>Instrucciones:</h3>
+                    <ul>
+                        <li>Coloca el objeto sobre una superficie plana</li>
+                        <li>Captura fotos desde diferentes ángulos (mínimo 8)</li>
+                        <li>Mantén el objeto en el centro de la cámara</li>
+                        <li>Muévete alrededor del objeto, no muevas el objeto</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de escaneo -->
+        <div id="scan-screen" class="screen">
+            <div class="camera-container">
+                <video id="camera" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+
+                <!-- Guía visual -->
+                <div class="scan-guide">
+                    <div class="guide-circle"></div>
+                    <div class="guide-text">Centra el objeto aquí</div>
+                </div>
+
+                <!-- Indicador de progreso -->
+                <div class="progress-indicator">
+                    <div class="progress-circle-container">
+                        <div id="progress-circles"></div>
+                    </div>
+                    <p class="progress-text">Capturas: <span id="capture-count">0</span>/12</p>
+                </div>
+
+                <!-- Controles -->
+                <div class="controls">
+                    <button id="capture-btn" class="btn-capture">
+                        <svg width="70" height="70" viewBox="0 0 70 70">
+                            <circle cx="35" cy="35" r="30" fill="white" opacity="0.9"/>
+                            <circle cx="35" cy="35" r="25" fill="none" stroke="#333" stroke-width="3"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <button id="cancel-scan-btn" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- Pantalla de procesamiento -->
+        <div id="processing-screen" class="screen">
+            <div class="container">
+                <h2>Generando Modelo 3D</h2>
+                <div class="spinner"></div>
+                <p id="processing-status">Procesando imágenes...</p>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p class="progress-percentage"><span id="progress-percent">0</span>%</p>
+            </div>
+        </div>
+
+        <!-- Pantalla de vista previa 3D -->
+        <div id="preview-screen" class="screen">
+            <div class="preview-header">
+                <h2>Vista Previa del Modelo</h2>
+                <button id="close-preview-btn" class="btn-close">×</button>
+            </div>
+            <div id="preview-container"></div>
+            <div class="preview-controls">
+                <button id="view-ar-btn" class="btn-primary">Ver en AR</button>
+                <button id="new-scan-btn" class="btn-secondary">Nuevo Escaneo</button>
+            </div>
+        </div>
+
+        <!-- Pantalla de AR -->
+        <div id="ar-screen" class="screen">
+            <div class="ar-header">
+                <h2>Realidad Aumentada</h2>
+                <button id="close-ar-btn" class="btn-close">×</button>
+            </div>
+            <model-viewer id="ar-viewer"
+                          ar
+                          ar-modes="webxr scene-viewer quick-look"
+                          camera-controls
+                          touch-action="pan-y"
+                          alt="Modelo 3D escaneado"
+                          shadow-intensity="1"
+                          environment-image="neutral"
+                          exposure="1">
+                <button slot="ar-button" class="ar-button">
+                    Ver en tu espacio
+                </button>
+            </model-viewer>
+            <div class="ar-instructions">
+                <p>Toca "Ver en tu espacio" para colocar el objeto en tu entorno</p>
+            </div>
+        </div>
+
+        <!-- Galería de capturas -->
+        <div id="capture-gallery" class="capture-gallery">
+            <h3>Capturas realizadas</h3>
+            <div id="gallery-grid"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
