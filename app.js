@@ -81,6 +81,15 @@ function setupEventListeners() {
     elements.newScanBtn.addEventListener('click', resetApp);
     elements.closePreviewBtn.addEventListener('click', () => showScreen('welcome'));
     elements.closeArBtn.addEventListener('click', () => showScreen('preview'));
+
+    // Eventos de model-viewer para debugging
+    elements.arViewer.addEventListener('load', () => {
+        console.log('Model Viewer: Modelo cargado correctamente');
+    });
+
+    elements.arViewer.addEventListener('error', (event) => {
+        console.error('Model Viewer: Error al cargar modelo', event.detail);
+    });
 }
 
 // Navegación entre pantallas
@@ -263,29 +272,36 @@ async function generateModel3D() {
     // En una aplicación real, aquí se usaría fotogrametría o algoritmos de reconstrucción 3D
     // Por ahora, creamos un modelo procedural que simula el proceso
 
-    const scene = new THREE.Scene();
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    return new Promise((resolve) => {
+        const scene = new THREE.Scene();
+        const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
 
-    // Crear material con textura de la primera captura
-    const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(AppState.captures[0].url);
+        // Crear material simple sin textura para evitar problemas de CORS en AR
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x6366f1,
+            roughness: 0.5,
+            metalness: 0.3
+        });
 
-    const material = new THREE.MeshStandardMaterial({
-        map: texture,
-        roughness: 0.5,
-        metalness: 0.3
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // Agregar luz a la escena para que sea visible en AR
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1);
+        scene.add(light);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        scene.add(mesh);
+
+        AppState.model3D = {
+            scene: scene,
+            mesh: mesh
+        };
+
+        resolve(AppState.model3D);
     });
-
-    const mesh = new THREE.Mesh(geometry, material);
-
-    AppState.model3D = {
-        scene: scene,
-        mesh: mesh
-    };
-
-    scene.add(mesh);
-
-    return AppState.model3D;
 }
 
 // Renderizar vista previa 3D
@@ -423,15 +439,35 @@ async function exportToGLB() {
             return;
         }
 
+        // Verificar que GLTFExporter esté disponible
+        if (typeof THREE.GLTFExporter === 'undefined') {
+            console.error('GLTFExporter no está disponible');
+            reject('GLTFExporter no cargado');
+            return;
+        }
+
+        console.log('Iniciando exportación a GLB...');
+
         // Usar GLTFExporter para convertir la escena a GLB
         const exporter = new THREE.GLTFExporter();
+
+        const options = {
+            binary: true,
+            maxTextureSize: 1024,
+            includeCustomExtensions: false
+        };
 
         exporter.parse(
             AppState.model3D.scene,
             (gltf) => {
+                console.log('Modelo exportado exitosamente', gltf);
+
                 // Convertir a Blob
                 const blob = new Blob([gltf], { type: 'model/gltf-binary' });
+                console.log('Blob creado, tamaño:', blob.size, 'bytes');
+
                 const url = URL.createObjectURL(blob);
+                console.log('URL creada:', url);
 
                 // Guardar URL para limpieza posterior
                 if (AppState.glbUrl) {
@@ -445,7 +481,7 @@ async function exportToGLB() {
                 console.error('Error en GLTFExporter:', error);
                 reject(error);
             },
-            { binary: true }
+            options
         );
     });
 }
