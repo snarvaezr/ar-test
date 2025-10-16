@@ -464,7 +464,7 @@ async function showARView() {
 // Exportar modelo a GLB usando GLTFExporter
 async function exportToGLB() {
     return new Promise((resolve, reject) => {
-        if (!AppState.model3D || !AppState.model3D.scene) {
+        if (!AppState.model3D || !AppState.model3D.mesh) {
             reject('No hay modelo 3D disponible');
             return;
         }
@@ -477,18 +477,22 @@ async function exportToGLB() {
         }
 
         console.log('Iniciando exportación a GLB...');
+        console.log('Mesh disponible:', AppState.model3D.mesh);
+        console.log('Scene children:', AppState.model3D.scene.children.length);
 
-        // Usar GLTFExporter para convertir la escena a GLB
+        // Usar GLTFExporter para convertir solo el mesh (no la escena vacía)
         const exporter = new THREE.GLTFExporter();
 
         const options = {
             binary: true,
             maxTextureSize: 1024,
-            includeCustomExtensions: false
+            includeCustomExtensions: false,
+            truncateDrawRange: false
         };
 
+        // Exportar el mesh directamente en lugar de la escena
         exporter.parse(
-            AppState.model3D.scene,
+            AppState.model3D.mesh,  // Cambio clave: exportar mesh en lugar de scene
             (result) => {
                 console.log('Modelo exportado exitosamente');
                 console.log('Tipo de resultado:', typeof result);
@@ -506,6 +510,7 @@ async function exportToGLB() {
                     const jsonString = JSON.stringify(result);
                     blob = new Blob([jsonString], { type: 'model/gltf+json' });
                     console.log('Blob GLTF JSON creado desde objeto');
+                    console.log('Keys en resultado:', Object.keys(result));
                 }
                 else {
                     reject('Formato de exportación no reconocido');
@@ -518,8 +523,9 @@ async function exportToGLB() {
                 // Debug: intentar leer el contenido del blob
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    console.log('Contenido del blob (primeros 200 chars):',
-                        e.target.result.substring ? e.target.result.substring(0, 200) : 'Binary data');
+                    const content = e.target.result;
+                    const preview = content.substring ? content.substring(0, 300) : 'Binary data';
+                    console.log('Contenido del blob (primeros 300 chars):', preview);
                 };
                 reader.readAsText(blob);
 
