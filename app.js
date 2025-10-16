@@ -276,10 +276,110 @@ async function processImages() {
     }, 500);
 }
 
-// Generar modelo 3D usando fotogrametría simplificada
+// Generar modelo 3D usando fotogrametría profesional
 async function generateModel3D() {
     console.log('=== Iniciando reconstrucción 3D ===');
     console.log('Capturas disponibles:', AppState.captures.length);
+
+    const config = window.PHOTOGRAMMETRY_CONFIG;
+
+    // Intentar backend profesional primero
+    if (config && config.services && config.services.custom && config.services.custom.enabled) {
+        try {
+            console.log('Usando backend profesional...');
+            return await generateModelWithBackend(config.services.custom.endpoint);
+        } catch (error) {
+            console.error('Backend profesional falló:', error);
+            console.log('Fallback a fotogrametría local...');
+        }
+    }
+
+    // Fallback a procesamiento local
+    return await generateModelLocally();
+}
+
+// Generar modelo usando backend profesional
+async function generateModelWithBackend(endpoint) {
+    console.log('Enviando imágenes al backend...');
+
+    const formData = new FormData();
+
+    // Agregar todas las capturas
+    for (let i = 0; i < AppState.captures.length; i++) {
+        formData.append('images', AppState.captures[i].blob, `capture_${i}.jpg`);
+    }
+
+    // Opciones de procesamiento
+    formData.append('options', JSON.stringify({
+        quality: 'high',
+        outputFormat: 'glb',
+        textureResolution: 2048,
+        decimationTarget: 50000
+    }));
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Backend error: ${response.status} - ${errorText}`);
+        }
+
+        // Recibir modelo GLB
+        const blob = await response.blob();
+        console.log('Modelo recibido del backend:', blob.size, 'bytes');
+
+        // Cargar el GLB con Three.js GLTFLoader
+        const loader = new THREE.GLTFLoader();
+        const url = URL.createObjectURL(blob);
+
+        return new Promise((resolve, reject) => {
+            loader.load(
+                url,
+                (gltf) => {
+                    console.log('Modelo GLB cargado exitosamente');
+
+                    const scene = new THREE.Scene();
+                    const mesh = gltf.scene.children[0];
+
+                    scene.add(mesh);
+
+                    AppState.model3D = {
+                        scene: scene,
+                        mesh: mesh,
+                        gltf: gltf,
+                        isFromBackend: true,
+                        captureCount: AppState.captures.length
+                    };
+
+                    console.log('Modelo 3D profesional generado');
+
+                    // Guardar blob URL para GLB export
+                    AppState.glbUrl = url;
+
+                    resolve(AppState.model3D);
+                },
+                undefined,
+                (error) => {
+                    console.error('Error cargando GLB:', error);
+                    URL.revokeObjectURL(url);
+                    reject(error);
+                }
+            );
+        });
+
+    } catch (error) {
+        console.error('Error con backend:', error);
+        throw error;
+    }
+}
+
+// Generar modelo localmente (fallback)
+async function generateModelLocally() {
+    console.log('Usando reconstrucción local...');
 
     try {
         const scene = new THREE.Scene();
@@ -290,7 +390,7 @@ async function generateModel3D() {
         // Reconstruir geometría desde las capturas
         const geometry = await photogrammetry.reconstruct();
 
-        console.log('Geometría reconstruida:', geometry.type);
+        console.log('Geometría reconstruida localmente');
 
         // Cargar textura principal
         const textureLoader = new THREE.TextureLoader();
@@ -299,8 +399,6 @@ async function generateModel3D() {
             textureLoader.load(
                 AppState.captures[0].url,
                 (texture) => {
-                    console.log('Textura principal cargada');
-
                     const material = new THREE.MeshStandardMaterial({
                         map: texture,
                         roughness: 0.6,
@@ -316,23 +414,17 @@ async function generateModel3D() {
                         mesh: mesh,
                         geometry: geometry,
                         pointCloud: photogrammetry.pointCloud,
+                        isFromBackend: false,
                         captureCount: AppState.captures.length
                     };
 
-                    console.log('Modelo 3D generado:', {
-                        geometryType: geometry.type,
-                        vertices: geometry.attributes.position.count,
-                        points: photogrammetry.pointCloud.length,
-                        capturas: AppState.captures.length
-                    });
-
+                    console.log('Modelo 3D local generado');
                     resolve(AppState.model3D);
                 },
                 undefined,
                 (error) => {
                     console.error('Error cargando textura:', error);
 
-                    // Crear sin textura
                     const material = new THREE.MeshStandardMaterial({
                         color: 0x6366f1,
                         roughness: 0.6,
@@ -346,7 +438,8 @@ async function generateModel3D() {
                     AppState.model3D = {
                         scene: scene,
                         mesh: mesh,
-                        geometry: geometry
+                        geometry: geometry,
+                        isFromBackend: false
                     };
 
                     resolve(AppState.model3D);
@@ -354,9 +447,7 @@ async function generateModel3D() {
             );
         });
     } catch (error) {
-        console.error('Error en reconstrucción 3D:', error);
-
-        // Fallback a geometría simple
+        console.error('Error en reconstrucción local:', error);
         return createSimpleFallbackModel();
     }
 }
