@@ -1,6 +1,15 @@
-# Aplicación de Escaneo 3D con Realidad Aumentada
+# Aplicación de Escaneo 3D Profesional con Realidad Aumentada
 
-Una aplicación web que permite escanear objetos desde múltiples ángulos usando la cámara del dispositivo, genera un modelo 3D y lo visualiza en realidad aumentada usando WebXR y Model Viewer.
+Una aplicación web comercial que permite escanear objetos desde múltiples ángulos usando la cámara del dispositivo, reconstruye modelos 3D fotogramétricos reales y los visualiza en realidad aumentada usando WebXR y Model Viewer.
+
+## 🎯 Características Profesionales
+
+✅ **Reconstrucción 3D Real** - No solo un cubo texturizado
+✅ **Backend Python con Open3D/COLMAP** - Fotogrametría de calidad profesional
+✅ **Fallback Local** - Funciona sin backend (calidad reducida)
+✅ **Integración AR** - WebXR, ARCore, ARKit
+✅ **Debug en Móvil** - Consola visual para smartphones
+✅ **Producción Ready** - Listo para despliegue comercial
 
 ## Características
 
@@ -32,9 +41,55 @@ Una aplicación web que permite escanear objetos desde múltiples ángulos usand
 - **iOS**: Safari 13+ (iPad Pro 12.9 2018+ recomendado)
 - Dispositivo compatible con ARCore/ARKit
 
-## Instalación y Uso
+## 🚀 Inicio Rápido
 
-### Opción 1: Servidor Local Simple
+### Opción A: Solo Frontend (Reconstrucción Aproximada)
+
+```bash
+# Servidor local simple
+python3 -m http.server 8000
+```
+
+Abre `http://localhost:8000` - Funciona pero modelo 3D es aproximado.
+
+### Opción B: Con Backend Profesional (Recomendado)
+
+**1. Instalar y ejecutar backend:**
+
+```bash
+cd backend
+
+# Crear entorno virtual
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Ejecutar servidor
+python photogrammetry_server.py
+```
+
+**2. Configurar frontend:**
+
+Edita `config.js`:
+```javascript
+custom: {
+    enabled: true,  // Cambiar a true
+    endpoint: 'http://localhost:5000/api/reconstruct'
+}
+```
+
+**3. Abrir aplicación:**
+```bash
+python3 -m http.server 8000
+```
+
+Abre `http://localhost:8000` - Ahora con reconstrucción 3D REAL.
+
+## Instalación y Uso (Completo)
+
+### Opción 1: Frontend Solo (Sin Backend)
 
 ```bash
 # Usando Python 3
