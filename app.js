@@ -276,75 +276,109 @@ async function processImages() {
     }, 500);
 }
 
-// Generar modelo 3D (simulado basado en las capturas)
+// Generar modelo 3D usando fotogrametría simplificada
 async function generateModel3D() {
-    // En una aplicación real, aquí se usaría fotogrametría o algoritmos de reconstrucción 3D
-    // Por ahora, creamos un modelo procedural texturizado con las capturas
+    console.log('=== Iniciando reconstrucción 3D ===');
+    console.log('Capturas disponibles:', AppState.captures.length);
 
-    return new Promise((resolve) => {
+    try {
         const scene = new THREE.Scene();
-        const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
 
-        console.log('Generando modelo con', AppState.captures.length, 'capturas');
+        // Crear instancia de fotogrametría
+        const photogrammetry = new SimplePhotogrammetry(AppState.captures);
 
-        // Crear material con textura de la primera captura
+        // Reconstruir geometría desde las capturas
+        const geometry = await photogrammetry.reconstruct();
+
+        console.log('Geometría reconstruida:', geometry.type);
+
+        // Cargar textura principal
         const textureLoader = new THREE.TextureLoader();
 
-        // Cargar textura desde la primera captura
-        textureLoader.load(
-            AppState.captures[0].url,
-            (texture) => {
-                console.log('Textura cargada exitosamente');
+        return new Promise((resolve) => {
+            textureLoader.load(
+                AppState.captures[0].url,
+                (texture) => {
+                    console.log('Textura principal cargada');
 
-                // Crear material con la textura
-                const material = new THREE.MeshStandardMaterial({
-                    map: texture,
-                    roughness: 0.7,
-                    metalness: 0.2
-                });
+                    const material = new THREE.MeshStandardMaterial({
+                        map: texture,
+                        roughness: 0.6,
+                        metalness: 0.3,
+                        side: THREE.DoubleSide
+                    });
 
-                const mesh = new THREE.Mesh(geometry, material);
-                scene.add(mesh);
+                    const mesh = new THREE.Mesh(geometry, material);
+                    scene.add(mesh);
 
-                AppState.model3D = {
-                    scene: scene,
-                    mesh: mesh,
-                    texture: texture
-                };
+                    AppState.model3D = {
+                        scene: scene,
+                        mesh: mesh,
+                        geometry: geometry,
+                        pointCloud: photogrammetry.pointCloud,
+                        captureCount: AppState.captures.length
+                    };
 
-                console.log('Modelo 3D generado con textura:', {
-                    geometry: geometry.type,
-                    vertices: geometry.attributes.position.count,
-                    material: material.type,
-                    hasTexture: true
-                });
+                    console.log('Modelo 3D generado:', {
+                        geometryType: geometry.type,
+                        vertices: geometry.attributes.position.count,
+                        points: photogrammetry.pointCloud.length,
+                        capturas: AppState.captures.length
+                    });
 
-                resolve(AppState.model3D);
-            },
-            undefined,
-            (error) => {
-                console.error('Error al cargar textura:', error);
-                // Fallback: crear material sin textura
-                const material = new THREE.MeshStandardMaterial({
-                    color: 0x6366f1,
-                    roughness: 0.5,
-                    metalness: 0.3,
-                    emissive: 0x6366f1,
-                    emissiveIntensity: 0.3
-                });
+                    resolve(AppState.model3D);
+                },
+                undefined,
+                (error) => {
+                    console.error('Error cargando textura:', error);
 
-                const mesh = new THREE.Mesh(geometry, material);
-                scene.add(mesh);
+                    // Crear sin textura
+                    const material = new THREE.MeshStandardMaterial({
+                        color: 0x6366f1,
+                        roughness: 0.6,
+                        metalness: 0.3,
+                        side: THREE.DoubleSide
+                    });
 
-                AppState.model3D = {
-                    scene: scene,
-                    mesh: mesh
-                };
+                    const mesh = new THREE.Mesh(geometry, material);
+                    scene.add(mesh);
 
-                console.log('Modelo 3D generado sin textura (fallback)');
-                resolve(AppState.model3D);
-            }
-        );
+                    AppState.model3D = {
+                        scene: scene,
+                        mesh: mesh,
+                        geometry: geometry
+                    };
+
+                    resolve(AppState.model3D);
+                }
+            );
+        });
+    } catch (error) {
+        console.error('Error en reconstrucción 3D:', error);
+
+        // Fallback a geometría simple
+        return createSimpleFallbackModel();
+    }
+}
+
+// Fallback: crear modelo simple si falla la reconstrucción
+function createSimpleFallbackModel() {
+    console.log('Usando modelo fallback simple');
+
+    const scene = new THREE.Scene();
+    const geometry = new THREE.CylinderGeometry(0.15, 0.15, 0.3, 12);
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x6366f1,
+        roughness: 0.6,
+        metalness: 0.3
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+
+    return Promise.resolve({
+        scene: scene,
+        mesh: mesh
     });
 }
 
