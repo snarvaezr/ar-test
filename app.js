@@ -91,7 +91,13 @@ function setupEventListeners() {
     });
 
     elements.arViewer.addEventListener('error', (event) => {
-        console.error('Model Viewer: Error al cargar modelo', event.detail);
+        console.error('Model Viewer: Error al cargar modelo');
+        console.error('Event detail:', event.detail);
+        console.error('Event type:', event.type);
+        console.error('Stringified detail:', JSON.stringify(event.detail, null, 2));
+        if (event.detail && event.detail.message) {
+            console.error('Error message:', event.detail.message);
+        }
     });
 }
 
@@ -423,6 +429,17 @@ async function showARView() {
 
     showScreen('ar');
 
+    // TEMPORAL: Probar primero con un modelo de ejemplo
+    const useExampleModel = false; // Cambiar a true para debug
+
+    if (useExampleModel) {
+        console.log('Usando modelo de ejemplo para prueba');
+        // Modelo público de ejemplo de Google
+        elements.arViewer.src = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        console.log('Model Viewer src configurado con modelo de ejemplo');
+        return;
+    }
+
     // Exportar modelo a formato GLB para AR
     try {
         console.log('Llamando a exportToGLB...');
@@ -496,6 +513,15 @@ async function exportToGLB() {
                 }
 
                 console.log('Blob creado, tamaño:', blob.size, 'bytes');
+                console.log('Blob type:', blob.type);
+
+                // Debug: intentar leer el contenido del blob
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log('Contenido del blob (primeros 200 chars):',
+                        e.target.result.substring ? e.target.result.substring(0, 200) : 'Binary data');
+                };
+                reader.readAsText(blob);
 
                 const url = URL.createObjectURL(blob);
                 console.log('URL creada:', url);
